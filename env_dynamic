@@ -1,0 +1,18 @@
+# File paths
+AWS_CSV=/home/admin/git/webhook-test/add-remove/aws.csv
+AZURE_CSV=/home/admin/git/webhook-test/add-remove/azure.csv
+CADR_AWS_CSV=/home/admin/git/webhook-test/add-remove/ca-dr.csv
+
+# Log files
+ACCESS_LOG=/home/admin/git/webhook-test/add-remove/access_log.txt
+ERROR_LOG=/home/admin/git/webhook-test/add-remove/error_log.txt
+
+# Database files
+AWS_DATABASE=/home/admin/git/salt-it-pillar/database.csv
+AZURE_DATABASE=/home/admin/git/salt-it-pillar/azure/database.csv
+CADR_AWS_DATABASE=/home/admin/git/salt-it-pillar/cadr-aws/database.csv
+
+
+#Commit_details
+DIR=/home/admin/git/webhook-test
+BRANCH=main
