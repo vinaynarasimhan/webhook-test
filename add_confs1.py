@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 import csv
 import subprocess
 import datetime
 import os
+import sys
 
 # Load environment variables from env_dynamic file
 def load_env(env_file="env_dynamic"):
@@ -83,7 +85,7 @@ def check_and_update_database(hostname, database_file):
 def apply_state(minion):
     """Applies the Salt state for the given minion."""
     try:
-        result = subprocess.run(["sudo", "salt", minion, "state.apply", "vpn-client.check_confs"], capture_output=True, text=True)
+        result = subprocess.run(["sudo", "salt", minion, "state.apply", "check_confs"], capture_output=True, text=True)
         if "Succeeded:" in result.stdout and "Failed:    0" in result.stdout:
             log_access(f"{minion} conf files updated successfully.")
         else:
@@ -97,6 +99,9 @@ def process_aws_entries():
     database_file = env.get("AWS_DATABASE")
     if filename and database_file:
         git_diff = get_git_diff(filename)
+        if not git_diff:  # Exit silently if no diff found
+            sys.exit(0)
+            
         parsed_entries = parse_git_diff(git_diff)
         for hostname, status in parsed_entries:
             if status == "ADD":
