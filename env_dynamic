@@ -4,8 +4,15 @@ AZURE_CSV=/home/admin/git/webhook-test/add-remove/azure.csv
 CADR_AWS_CSV=/home/admin/git/webhook-test/add-remove/ca-dr.csv
 
 # Log files
-ACCESS_LOG=/home/admin/git/webhook-test/add-remove/access_log.txt
-ERROR_LOG=/home/admin/git/webhook-test/add-remove/error_log.txt
+ACCESS_LOG=/home/admin/git/webhook-test/add-remove/execute.log
+ERROR_LOG=/home/admin/git/webhook-test/add-remove/error.log
+AWS_HADD_LOG=/home/admin/git/webhook-test/add-remove/aws_host_add.log
+AWS_HREM_LOG=/home/admin/git/webhook-test/add-remove/aws_host_remove.log
+AZURE_HADD_LOG=/home/admin/git/webhook-test/add-remove/azure_host_add.log
+AZURE_HREM_LOG=/home/admin/git/webhook-test/add-remove/azure_host_remove.log
+CADRAWS_HADD_LOG=/home/admin/git/webhook-test/add-remove/cadraws_host_add.log
+CADRAWS_HREM_LOG=/home/admin/git/webhook-test/add-remove/cadraws_host_remove.log
+
 
 # Database files
 AWS_DATABASE=/home/admin/git/salt-it-pillar/database.csv

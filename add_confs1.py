@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
 import csv
 import subprocess
 import datetime
 import os
-import sys
 
 # Load environment variables from env_dynamic file
 def load_env(env_file="env_dynamic"):
@@ -32,14 +30,6 @@ def log_error(message):
     with open(log_file, "a") as log_file:
         log_file.write(f"{timestamp} - Error - {message}\n")
 
-def log_access(message):
-    """Logs an access message and ensures the log file exists."""
-    log_file = env.get("ACCESS_LOG", "access_log.txt")
-    ensure_log_file_exists(log_file)
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(log_file, "a") as log_file:
-        log_file.write(f"{timestamp} - {message}\n")
-
 def get_git_diff(filename):
     """Gets the git diff for a specific file."""
     try:
@@ -52,77 +42,59 @@ def get_git_diff(filename):
 def parse_git_diff(diff_lines):
     """Parses the git diff output to extract new entries."""
     parsed_entries = []
+    seen_hostnames = set()
     for line in diff_lines:
         if line.startswith("+") and not line.startswith("++"):  # Ignore metadata lines
             parts = line[1:].split(",")
             if len(parts) == 2:
                 hostname, status = parts[0].strip(), parts[1].strip().upper()
+                if hostname in seen_hostnames:
+                    log_error(f"Hostname '{hostname}' has appeared multiple times, please correct and reraise a request with correct status.")
+                    continue
+                seen_hostnames.add(hostname)
                 if status not in ["ADD", "REMOVE"]:
-                    log_error(f"{hostname},{status} #Please correct STATUS, it can be either ADD or REMOVE")
+                    log_error(f"Hostname '{hostname}' status is incorrect, please correct and reraise a request.")
                 else:
                     parsed_entries.append((hostname, status))
     return parsed_entries
 
-def check_and_update_database(hostname, database_file):
-    """Checks if a hostname exists in the database, updates it if not."""
-    rows = read_csv(database_file)
-    existing_ids = set(row[0] for row in rows[1:] if row)  # Skip header
-
-    if hostname in existing_ids:
-        return True  # Already exists
-
-    empty_row_index = next((i for i, row in enumerate(rows) if row and row[0] == ''), None)
-    
-    if empty_row_index is not None:
-        rows[empty_row_index][0] = hostname  # Assign new hostname
-    else:
-        log_error(f"{hostname}, no more conf files available.")
-        return False
-
-    write_csv(database_file, rows)
-    return True
-
-def apply_state(minion):
-    """Applies the Salt state for the given minion."""
-    try:
-        result = subprocess.run(["sudo", "salt", minion, "state.apply", "check_confs"], capture_output=True, text=True)
-        if "Succeeded:" in result.stdout and "Failed:    0" in result.stdout:
-            log_access(f"{minion} conf files updated successfully.")
-        else:
-            log_error(f"{minion} state apply failed.")
-    except Exception as e:
-        log_error(f"Salt apply error for {minion}: {str(e)}")
+def write_log_file(log_file, entries):
+    """Overwrites log file with new entries."""
+    with open(log_file, "w") as file:
+        for entry in entries:
+            file.write(f"{entry}\n")
 
 def process_aws_entries():
-    """Processes parsed entries for AWS CSV and AWS database."""
+    """Processes parsed entries for AWS CSV and logs ADD/REMOVE hosts."""
     filename = env.get("AWS_CSV")
-    database_file = env.get("AWS_DATABASE")
-    if filename and database_file:
-        git_diff = get_git_diff(filename)
-        if not git_diff:  # Exit silently if no diff found
-            sys.exit(0)
-            
-        parsed_entries = parse_git_diff(git_diff)
-        for hostname, status in parsed_entries:
-            if status == "ADD":
-                if check_and_update_database(hostname, database_file):
-                    apply_state(hostname)
-
-def commit_and_push_changes():
-    """Commits and pushes changes if log files are modified."""
+    hadd_log = env.get("AWS_HADD_LOG")
+    hrem_log = env.get("AWS_HREM_LOG")
     dir_path = env.get("DIR", "./")
     branch = env.get("BRANCH", "main")
-    try:
-        subprocess.run(["git", "-C", dir_path, "add", "-A"], check=True)
-        subprocess.run(["git", "-C", dir_path, "commit", "-m", f"Auto-commit: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
-        subprocess.run(["git", "-C", dir_path, "push", "origin", branch], check=True)
-        log_access("Changes committed and pushed successfully.")
-    except subprocess.CalledProcessError as e:
-        log_error(f"Git commit/push failed: {str(e)}")
+    
+    if filename and hadd_log and hrem_log:
+        git_diff = get_git_diff(filename)
+        parsed_entries = parse_git_diff(git_diff)
+        
+        add_hosts = [hostname for hostname, status in parsed_entries if status == "ADD"]
+        remove_hosts = [hostname for hostname, status in parsed_entries if status == "REMOVE"]
+        
+        if add_hosts:
+            write_log_file(hadd_log, add_hosts)
+        if remove_hosts:
+            write_log_file(hrem_log, remove_hosts)
+        
+        # If no entries were written to the logs, commit and push changes
+        if not add_hosts and not remove_hosts:
+            try:
+                subprocess.run(["git", "-C", dir_path, "add", "-A"], check=True)
+                subprocess.run(["git", "-C", dir_path, "commit", "-m", f"Auto-commit: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+                subprocess.run(["git", "-C", dir_path, "push", "origin", branch], check=True)
+            except subprocess.CalledProcessError as e:
+                log_error(f"Git commit/push failed: {str(e)}")
 
 def main():
     process_aws_entries()
-    commit_and_push_changes()
 
 if __name__ == "__main__":
     main()
